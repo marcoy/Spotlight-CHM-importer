@@ -67,8 +67,8 @@ NSString * const com_marcoyuen_chmImporter_SectionTitles = @"com_marcoyuen_chm_S
 }
 
 + (NSMutableData *) toDataFromCHMHandle:(struct chmFile * const) chmHandle
-                                 unitInfo:(struct chmUnitInfo * const) ui
-                                   retVal:(int *)retVal
+                               unitInfo:(struct chmUnitInfo * const) ui
+                                 retVal:(int *)retVal
 {
     static unsigned char buf[BUFSIZ + 1];
     bzero(buf, BUFSIZ+1);
@@ -103,10 +103,11 @@ extractMetaData(struct chmFile *chmHandle,
     NSMutableDictionary *ctxDict = (NSMutableDictionary *)context;
     int retEnumVal = CHM_ENUMERATOR_CONTINUE;
     NSError *theError = nil;
-    NSString *strippedDataStr = nil;
+    NSMutableString *strippedDataStr = nil;
     
     // Only handle normal file objects within the CHM
     if ( ui->flags & CHM_ENUMERATE_FILES && ui->flags & CHM_ENUMERATE_NORMAL ) {
+        NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
         
         // Extract metadata from HTML files.
         if (strcasestr(ui->path, ".htm")) {
@@ -124,10 +125,9 @@ extractMetaData(struct chmFile *chmHandle,
             
             // Set attributes
             NSMutableString * textContentAttr = [ctxDict objectForKey: (NSString *)kMDItemTextContent];
-            strippedDataStr = [[NSString alloc] initWithData:strippedData encoding: DEFAULT_ENCODING];
+            strippedDataStr = [[[NSMutableString alloc] initWithData:strippedData encoding: DEFAULT_ENCODING] autorelease];
             if (nil == textContentAttr) {
-                textContentAttr = [NSMutableString stringWithString:strippedDataStr];
-                [ctxDict setObject:textContentAttr forKey: (NSString *)kMDItemTextContent];
+                [ctxDict setObject:strippedDataStr forKey: (NSString *)kMDItemTextContent];
             } else {
                 // If the combine size is greater than MAX_FILE_SIZE. Stop enumerating and return.
                 if ([textContentAttr length] + [strippedDataStr length] >= MAX_FILE_SIZE) {
@@ -179,10 +179,11 @@ extractMetaData(struct chmFile *chmHandle,
             [ctxDict setObject:sectionTitles forKey:com_marcoyuen_chmImporter_SectionTitles];
             // NSLog(@"The title:\n%@", sectionTitles);
         }
-    }
         
 metadata_cleanup:
-    if (strippedDataStr != nil) [strippedDataStr release];
+        [pool drain], pool = nil;
+    }
+    
     return retEnumVal;
 }
 
@@ -190,9 +191,9 @@ metadata_cleanup:
 #pragma mark Importer entrance function
 Boolean 
 GetMetadataForFile(void* thisInterface, 
-                           CFMutableDictionaryRef attributes, 
-                           CFStringRef contentTypeUTI,
-                           CFStringRef pathToFile)
+                   CFMutableDictionaryRef attributes, 
+                   CFStringRef contentTypeUTI,
+                   CFStringRef pathToFile)
 {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     
